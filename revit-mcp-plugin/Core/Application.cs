@@ -27,13 +27,40 @@ namespace revit_mcp_plugin.Core
             mcp_settings_pushButtonData.LargeImage = new BitmapImage(new Uri("/revit-mcp-plugin;component/Core/Ressources/settings-32.png", UriKind.RelativeOrAbsolute));
             mcpPanel.AddItem(mcp_settings_pushButtonData);
 
+            // DocumentOpenedイベントでSocketServiceを初期化
+            application.ControlledApplication.DocumentOpened += OnDocumentOpened;
+            
             return Result.Succeeded;
+        }
+
+        private void OnDocumentOpened(object sender, Autodesk.Revit.DB.Events.DocumentOpenedEventArgs e)
+        {
+            try
+            {
+                // UIApplicationを取得
+                UIApplication uiApp = new UIApplication(e.Document.Application);
+                
+                // SocketServiceを初期化して開始
+                SocketService service = SocketService.Instance;
+                if (!service.IsRunning)
+                {
+                    service.Initialize(uiApp);
+                    service.Start();
+                }
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Revit MCP Plugin", $"Failed to initialize SocketService: {ex.Message}");
+            }
         }
 
         public Result OnShutdown(UIControlledApplication application)
         {
             try
             {
+                // イベントハンドラーを削除
+                application.ControlledApplication.DocumentOpened -= OnDocumentOpened;
+                
                 if (SocketService.Instance.IsRunning)
                 {
                     SocketService.Instance.Stop();
